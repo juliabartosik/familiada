@@ -49,6 +49,31 @@ let questions = [
     }
 ];
 
+let finalQuestions = [
+    { q: "Więcej niż jedno zwierzę to...", answers: { "LAMA": 42, "OWCA": 33, "STADO": 15, "WATAHA": 10, "MROWISKO": 5 } },
+    { q: "Przedmiot w piórniku?", answers: { "DLUGOPIS": 50, "OLOWEK": 30, "GUMKA": 15, "LINIJK": 5 } },
+    { q: "Coś, co kładziemy na chleb?", answers: { "MASLO": 40, "SZYNKA": 25, "SER": 20, "DZEM": 10 } },
+    { q: "Dzień tygodnia na 'P'?", answers: { "PONIEDZIALEK": 60, "PIATEK": 35 } },
+    { q: "Zwierzę na literę 'K'?", answers: { "KOT": 45, "PIES": 0, "KON": 30, "KROWA": 20 } }
+];
+
+let finalState = {
+    active: true,
+    currentPlayer: 1,
+    p1: {
+        answers: [],
+        points: [],
+        revealed: [false, false, false, false, false],
+        pointsRevealed: [false, false, false, false, false]
+    },
+    p2: {
+        answers: [],
+        points: [],
+        revealed: [false, false, false, false, false],
+        pointsRevealed: [false, false, false, false, false]
+    }
+}
+
 let currentQuestionIndex = 0;
 let gameState = {
     activeQuestion: questions[currentQuestionIndex].question,
@@ -57,9 +82,15 @@ let gameState = {
     teamBStrikes: 0,
     teamAPoints: 0,
     teamBPoints: 0,
-    winner: null, // To przechowuje kto aktualnie odpowiada (np. "DRUŻYNA MONIKI")
+    winner: null,
     lastAction: null,
-    boardLocked: false
+    boardLocked: false,
+    finalState: {
+        active: false,
+        currentPlayer: 1,
+        p1: { answers: [], points: [], revealed: Array(5).fill(false), pointsRevealed: Array(5).fill(false) },
+        p2: { answers: [], points: [], revealed: Array(5).fill(false), pointsRevealed: Array(5).fill(false) }
+    }
 };
 
 io.on('connection', (socket) => {
@@ -78,67 +109,60 @@ io.on('connection', (socket) => {
     socket.on('admin-action', (data) => {
         const time = new Date().toLocaleTimeString();
 
-        // Blokada akcji jeśli runda zakończona (rozdano punkty)
-        if (gameState.boardLocked && !['next-question', 'reset-strikes', 'reset-buzzer'].includes(data.type)) {
+        if (gameState.boardLocked && !['next-question', 'reset-strikes', 'reset-buzzer', 'resetStrikeA', 'resetStrikeB'].includes(data.type)) {
             return;
         }
 
         switch (data.type) {
             case 'reveal':
-                if (!gameState.answers[data.index].revealed) {
-                    gameState.answers[data.index].revealed = true;
-                    gameState.lastAction = 'reveal';
-                    console.log(`[${time}] ODKRYCIE: Poz. ${data.index + 1} (${gameState.answers[data.index].text})`);
+                if (gameState.answers[data.index]) {
+                    if (!gameState.answers[data.index].revealed) {
+                        gameState.answers[data.index].revealed = true;
+                        gameState.lastAction = 'reveal';
+                        console.log(`[${time}] ODKRYCIE: Poz. ${data.index + 1} (${gameState.answers[data.index].text})`);
+                    }
+                } else {
+                    console.log(`[${time}] BŁĄD: Próba odkrycia nieistniejącego indeksu: ${data.index}`);
                 }
                 break;
 
             case 'strikeA':
-                // MONIKA może dostać błąd TYLKO jeśli ona odpowiada LUB nikt nie jest wybrany (buzzer)
                 if (gameState.winner === "DRUŻYNA MONIKI" || !gameState.winner) {
                     gameState.teamAStrikes = Math.min(gameState.teamAStrikes + 1, 3);
                     gameState.lastAction = 'strikeA';
-                    console.log(`[${time}] BŁĄD MONIKI: Stan ${gameState.teamAStrikes}/3`);
-
                     if (gameState.teamAStrikes === 3 && gameState.teamBStrikes < 3) {
                         gameState.winner = 'DRUŻYNA SZYMONA';
-                        console.log(`[${time}] PRZEJĘCIE: Szansa dla Szymona.`);
                     } else if (gameState.teamAStrikes === 3 && gameState.teamBStrikes === 3) {
                         handleAutoFinish('DRUŻYNA SZYMONA');
                     }
-                } else {
-                    console.log(`[${time}] BLOKADA: Nie można dać błędu Monice, gdy odpowiada Szymon!`);
                 }
                 break;
 
             case 'strikeB':
-                // SZYMON może dostać błąd TYLKO jeśli on odpowiada LUB nikt nie jest wybrany
                 if (gameState.winner === "DRUŻYNA SZYMONA" || !gameState.winner) {
                     gameState.teamBStrikes = Math.min(gameState.teamBStrikes + 1, 3);
                     gameState.lastAction = 'strikeB';
-                    console.log(`[${time}] BŁĄD SZYMONA: Stan ${gameState.teamBStrikes}/3`);
-
                     if (gameState.teamBStrikes === 3 && gameState.teamAStrikes < 3) {
                         gameState.winner = 'DRUŻYNA MONIKI';
-                        console.log(`[${time}] PRZEJĘCIE: Szansa dla Moniki.`);
                     } else if (gameState.teamAStrikes === 3 && gameState.teamBStrikes === 3) {
                         handleAutoFinish('DRUŻYNA MONIKI');
                     }
-                } else {
-                    console.log(`[${time}] BLOKADA: Nie można dać błędu Szymonowi, gdy odpowiada Monika!`);
                 }
                 break;
 
-            case 'reset-strikes':
+            case 'resetStrikeA':
                 gameState.teamAStrikes = 0;
+                gameState.lastAction = 'reset-strikes';
+                break;
+
+            case 'resetStrikeB':
                 gameState.teamBStrikes = 0;
                 gameState.lastAction = 'reset-strikes';
-                console.log(`[${time}] RESET: Wyzerowano błędy obu drużyn.`);
                 break;
 
             case 'reset-buzzer':
                 gameState.winner = null;
                 gameState.lastAction = 'reset-buzzer';
-                console.log(`[${time}] RESET: Buzzer wolny.`);
                 break;
 
             case 'addPointsA':
@@ -163,17 +187,44 @@ io.on('connection', (socket) => {
                 };
                 console.log(`[${time}] NOWE PYTANIE: ${gameState.activeQuestion}`);
                 break;
+        }
+        io.emit('update', gameState);
+    });
 
-            case 'resetStrikeA':
-                gameState.teamAStrikes = 0;
-                gameState.lastAction = 'reset-strikes';
-                console.log(`[${new Date().toLocaleTimeString()}] RESET: Wyzerowano błędy Moniki.`);
+    socket.on('final-action', (data) => {
+        const { type, player, index, val } = data;
+        const fs = gameState.finalState; // Operujemy na tym obiekcie
+        const pKey = player === 1 ? 'p1' : 'p2';
+
+        switch (type) {
+            case 'start-final':
+                fs.active = true;
+                console.log("URUCHOMIONO FINAŁ");
                 break;
 
-            case 'resetStrikeB':
-                gameState.teamBStrikes = 0;
-                gameState.lastAction = 'reset-strikes';
-                console.log(`[${new Date().toLocaleTimeString()}] RESET: Wyzerowano błędy Szymona.`);
+            case 'submit-ans':
+                if (fs[pKey].answers.length < 5) {
+                    const answerUpper = val.toUpperCase().trim();
+                    fs[pKey].answers.push(answerUpper);
+
+                    const qIdx = fs[pKey].answers.length - 1;
+                    const points = finalQuestions[qIdx].answers[answerUpper] || 0;
+                    fs[pKey].points.push(points);
+
+                    console.log(`Pytanie ${qIdx + 1}, Gracz ${player}: ${answerUpper} (${points} pkt)`);
+                }
+                break;
+
+            case 'reveal-ans':
+                fs[pKey].revealed[index] = true;
+                break;
+
+            case 'reveal-pts':
+                fs[pKey].pointsRevealed[index] = true;
+                break;
+
+            case 'switch-player':
+                fs.currentPlayer = 2;
                 break;
         }
 
