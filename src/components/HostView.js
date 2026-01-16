@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, Typography, Paper, Grid, TextField } from '@mui/material';
 import { FINAL_QUESTIONS_LIST } from '../questions/questions';
 
@@ -7,6 +7,30 @@ const HostView = ({ socket, gameState, finalState }) => {
     const currentBoardSum = gameState.answers
         .filter(ans => ans.revealed)
         .reduce((sum, ans) => sum + ans.points, 0);
+    const [timer, setTimer] = useState(0);
+    const [intervalId, setIntervalId] = useState(null);
+
+    const startTimer = (playerNum) => {
+        clearInterval(intervalId);
+        const maxTime = playerNum === 1 ? 15 : 20;
+        setTimer(maxTime);
+        const id = setInterval(() => {
+            setTimer(prev => {
+                if (prev <= 1) {
+                    clearInterval(id);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        setIntervalId(id);
+    };
+
+
+    useEffect(() => {
+        console.log("FINAL STATE:", finalState);
+    }, [finalState]);
+
 
     // LOGIKA FINAŁU WIDOKU HOSTA
     if (finalState?.active) {
@@ -37,7 +61,7 @@ const HostView = ({ socket, gameState, finalState }) => {
                                 color="primary"
                                 size="small"
                                 onClick={() => socket.emit('final-action', {
-                                    type: 'reveal-ans', // Nowy typ akcji
+                                    type: 'reveal-ans',
                                     player: playerNum,
                                     index: i
                                 })}
@@ -92,6 +116,16 @@ const HostView = ({ socket, gameState, finalState }) => {
                             sx={{ bgcolor: 'white', mt: 2, borderRadius: 1 }}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && localInput.trim() !== "") {
+                                    const answerUpper = localInput.toUpperCase().trim();
+
+                                    const otherPlayer = curPlayer === 1 ? finalState.p2 : finalState.p1;
+                                    if (otherPlayer.answers.includes(answerUpper)) {
+                                        alert("Ta odpowiedź została już użyta przez drugiego gracza!");
+                                        new Audio('/sounds/wrong.mp3').play().catch(() => {});
+                                        setLocalInput("");
+                                        return;
+                                    }
+
                                     socket.emit('final-action', {
                                         type: 'submit-ans',
                                         player: curPlayer,
@@ -112,9 +146,15 @@ const HostView = ({ socket, gameState, finalState }) => {
                 {/* Sekcja przycisków do odkrywania */}
                 <Grid container spacing={4}>
                     <Grid item xs={6}>
+                        <Button variant="contained" color="primary" onClick={() => startTimer(1)}>
+                            START 15s GRACZA 1
+                        </Button>
                         {renderPlayerControls(1)}
                     </Grid>
                     <Grid item xs={6}>
+                        <Button variant="contained" color="secondary" onClick={() => startTimer(2)}>
+                            START 20s GRACZA 2
+                        </Button>
                         {renderPlayerControls(2)}
                     </Grid>
                 </Grid>

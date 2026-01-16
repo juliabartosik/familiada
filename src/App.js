@@ -17,13 +17,11 @@ function App() {
   useEffect(() => {
     socket.on('update', (state) => {
       setGameState(state);
+      setFinalState(state.finalState);
+
       if (state.lastAction === 'reveal') new Audio('/sounds/correct.mp3').play().catch(() => { });
       if (state.lastAction === 'strikeA' || state.lastAction === 'strikeB') new Audio('/sounds/wrong.mp3').play().catch(() => { });
       if (state.lastAction === 'buzz') new Audio('/sounds/buzzer.mp3').play().catch(() => { });
-    });
-
-    socket.on('final-update', (fState) => {
-      setFinalState(fState);
     });
   }, []);
 
@@ -39,17 +37,14 @@ function App() {
   }
 
   if (!gameState) return <Typography align="center" sx={{ mt: 5 }}>Łączenie z serwerem...</Typography>;
-  // ... reszta kodu App.js
 
   if (role === 'board') {
-    // Tutaj było OK, ale upewnij się, że FinalBoard przyjmuje prop 'finalState' lub 'state'
     return finalState?.active
       ? <FinalBoard state={finalState} />
       : <ProjectorView gameState={gameState} />;
   }
 
   if (role === 'host') {
-    // ZMIANA: Przekazujemy finalState bezpośrednio z useState, a nie z gameState.finalState
     return <HostView
       socket={socket}
       gameState={gameState}
@@ -57,7 +52,6 @@ function App() {
     />;
   }
 
-  // ... reszta kodu
   if (role === 'buzzer') {
     return <BuzzerView socket={socket} gameState={gameState} />;
   }

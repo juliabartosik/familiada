@@ -32,7 +32,7 @@ let questions = [
     {
         question: "Do kogo Monika mówi kochanie?",
         answers: [
-            { text: "Długopis", points: 50, revealed: false },
+            { text: "Rafał", points: 50, revealed: false },
             { text: "Ołówek", points: 30, revealed: false },
             { text: "Gumka", points: 15, revealed: false },
             { text: "Linijka", points: 5, revealed: false }
@@ -41,7 +41,7 @@ let questions = [
     {
         question: "Jak do Szymona mówi tata Moniki?",
         answers: [
-            { text: "Długopis", points: 50, revealed: false },
+            { text: "Przybłęda", points: 50, revealed: false },
             { text: "Ołówek", points: 30, revealed: false },
             { text: "Gumka", points: 15, revealed: false },
             { text: "Linijka", points: 5, revealed: false }
@@ -57,23 +57,6 @@ let finalQuestions = [
     { q: "Zwierzę na literę 'K'?", answers: { "KOT": 45, "PIES": 0, "KON": 30, "KROWA": 20 } }
 ];
 
-let finalState = {
-    active: true,
-    currentPlayer: 1,
-    p1: {
-        answers: [],
-        points: [],
-        revealed: [false, false, false, false, false],
-        pointsRevealed: [false, false, false, false, false]
-    },
-    p2: {
-        answers: [],
-        points: [],
-        revealed: [false, false, false, false, false],
-        pointsRevealed: [false, false, false, false, false]
-    }
-}
-
 let currentQuestionIndex = 0;
 let gameState = {
     activeQuestion: questions[currentQuestionIndex].question,
@@ -88,10 +71,21 @@ let gameState = {
     finalState: {
         active: false,
         currentPlayer: 1,
-        p1: { answers: [], points: [], revealed: Array(5).fill(false), pointsRevealed: Array(5).fill(false) },
-        p2: { answers: [], points: [], revealed: Array(5).fill(false), pointsRevealed: Array(5).fill(false) }
+        p1: {
+            answers: [],
+            points: [],
+            revealed: Array(5).fill(false),
+            pointsRevealed: Array(5).fill(false)
+        },
+        p2: {
+            answers: [],
+            points: [],
+            revealed: Array(5).fill(false),
+            pointsRevealed: Array(5).fill(false)
+        }
     }
 };
+
 
 io.on('connection', (socket) => {
     console.log(`[${new Date().toLocaleTimeString()}] Nowe połączenie.`);
@@ -193,12 +187,28 @@ io.on('connection', (socket) => {
 
     socket.on('final-action', (data) => {
         const { type, player, index, val } = data;
-        const fs = gameState.finalState; // Operujemy na tym obiekcie
+        const fs = gameState.finalState;
         const pKey = player === 1 ? 'p1' : 'p2';
 
         switch (type) {
             case 'start-final':
+                if (fs.active) return;
                 fs.active = true;
+                fs.currentPlayer = 1;
+
+                fs.p1 = {
+                    answers: [],
+                    points: [],
+                    revealed: Array(5).fill(false),
+                    pointsRevealed: Array(5).fill(false)
+                };
+                fs.p2 = {
+                    answers: [],
+                    points: [],
+                    revealed: Array(5).fill(false),
+                    pointsRevealed: Array(5).fill(false)
+                };
+
                 console.log("URUCHOMIONO FINAŁ");
                 break;
 
